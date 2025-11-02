@@ -57,6 +57,18 @@ class GameManager:
             # cleanup broken connections
             for ws in to_remove:
                 self.disconnect(ws, game_id)
+    
+    async def send_to_player(self, game_id: str, player_name: str, message: dict):
+        """Send a direct message to a specific player."""
+        if (
+            game_id in self.connections
+            and player_name in self.connections[game_id]
+        ):
+            ws = self.connections[game_id][player_name]
+            try:
+                await ws.send_text(json.dumps(message))
+            except Exception as e:
+                print(f"Failed to send message to {player_name}: {e}")
 
     # ------------------------------
     # Game State Updates
@@ -98,15 +110,15 @@ class GameManager:
         if len(players) < 3:
             raise ValueError("At least 3 players required")
 
-        # Randomly assign imposters
+        # 🎭 Pick imposters
         num_imposters = random.randint(1, len(players) - 1)
         imposters = random.sample(players, num_imposters)
         game.imposters = imposters
 
-        # Generate questions
+        # 🧠 Generate questions
         q_main, q_imposter = self.generate_questions()
 
-        # Assign questions
+        # 📝 Assign questions
         for p in players:
             if p in imposters:
                 p.question = q_imposter
