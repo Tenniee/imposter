@@ -6,22 +6,45 @@ router = APIRouter()
 game_manager = GameManager()
 
 
-@router.websocket("/ws/games/{game_id}")
-async def websocket_endpoint_for_joining_game_updates(websocket: WebSocket, game_id: str):
-    """WebSocket endpoint for players to subscribe to game updates."""
-    await game_manager.connect(websocket, game_id)
+@router.websocket("/ws/games/{game_id}/{player_name}")
+async def websocket_endpoint_for_joining_game_updates(websocket: WebSocket, game_id: str, player_name: str):
+    """
+    WebSocket endpoint for players to subscribe to game updates.
+
+    Each player connects to this endpoint using their own player name.
+    This allows the backend to send private messages (like individual questions)
+    directly to that player.
+    """
+    # 1️⃣ When a player connects, register them to the game
+    #    We now pass both the game_id and player_name to track their connection
+    await game_manager.connect(websocket, game_id, player_name)
+    print(f"🔌 Player '{player_name}' connected to game {game_id}")
+
     try:
-        # Send the current state immediately when someone connects
+        # 2️⃣ Optionally send the current state of the game when they connect
         await game_manager.send_current_state(websocket, game_id)
 
+        # 3️⃣ Continuously listen for any messages coming from this specific client
+        #     (For example: chat messages, votes, or ready signals)
         while True:
-            # Keep listening for messages from this client
             data = await websocket.receive_text()
-            # (Optional) you could parse and handle commands here
-            await game_manager.broadcast(game_id, {"event": "message", "data": data})
+
+            # Here you can process commands sent from this player.
+            # For now, we just broadcast it to everyone in the same game.
+            await game_manager.broadcast(
+                game_id,
+                {
+                    "event": "message",
+                    "from": player_name,
+                    "data": data
+                }
+            )
 
     except WebSocketDisconnect:
+        # 4️⃣ If the connection is closed, remove this player’s WebSocket
         game_manager.disconnect(websocket, game_id)
+        print(f"❌ Player '{player_name}' disconnected from game {game_id}")
+
 
 
 @router.post("/create_game", response_model=CreateGameResponse)

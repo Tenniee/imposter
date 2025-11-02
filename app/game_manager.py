@@ -30,18 +30,33 @@ class GameManager:
     # ------------------------------
     # WebSocket Management
     # ------------------------------
-    async def connect(self, websocket: WebSocket, game_id: str):
-        """Add a websocket connection to a game."""
+    async def connect(self, websocket: WebSocket, game_id: str, player_name: str):
         await websocket.accept()
+
+        # Store in list (existing structure)
         if game_id not in self.connections:
             self.connections[game_id] = []
         self.connections[game_id].append(websocket)
 
+        # Store in map (new structure)
+        if game_id not in self.player_connections:
+            self.player_connections[game_id] = {}
+        self.player_connections[game_id][player_name] = websocket
+
+        print(f"✅ Player '{player_name}' connected to game {game_id}")
+
+
     def disconnect(self, websocket: WebSocket, game_id: str):
-        """Remove a websocket connection from a game."""
-        if game_id in self.connections:
-            if websocket in self.connections[game_id]:
-                self.connections[game_id].remove(websocket)
+        if game_id in self.connections and websocket in self.connections[game_id]:
+            self.connections[game_id].remove(websocket)
+
+        # Remove from player map as well
+        if game_id in self.player_connections:
+            for name, ws in list(self.player_connections[game_id].items()):
+                if ws == websocket:
+                    del self.player_connections[game_id][name]
+                    print(f"❌ Player '{name}' disconnected from {game_id}")
+                    break
 
     async def broadcast(self, game_id: str, message: dict):
         """Send a message to all connected websockets in the game."""
@@ -59,16 +74,15 @@ class GameManager:
                 self.disconnect(ws, game_id)
     
     async def send_to_player(self, game_id: str, player_name: str, message: dict):
-        """Send a direct message to a specific player."""
-        if (
-            game_id in self.connections
-            and player_name in self.connections[game_id]
-        ):
-            ws = self.connections[game_id][player_name]
+        if game_id in self.player_connections and player_name in self.player_connections[game_id]:
+            ws = self.player_connections[game_id][player_name]
             try:
                 await ws.send_text(json.dumps(message))
+                print(f"📤 Sent private message to {player_name}: {message}")
             except Exception as e:
-                print(f"Failed to send message to {player_name}: {e}")
+                print(f"⚠️ Failed to send message to {player_name}: {e}")
+        else:
+            print(f"⚠️ Player '{player_name}' not found in game {game_id}")
 
     # ------------------------------
     # Game State Updates
