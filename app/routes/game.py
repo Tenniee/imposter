@@ -8,26 +8,20 @@ game_manager = GameManager()
 
 @router.websocket("/ws/games/{game_id}")
 async def websocket_endpoint_for_joining_game_updates(websocket: WebSocket, game_id: str):
-    # 🔹 Extract player name from the query params
-    player_name = websocket.query_params.get("player")
-
-    # 🔹 Accept the WebSocket connection
-    await websocket.accept()
-
-    # 🔹 Register connection in your game manager
-    await game_manager.connect(websocket, game_id, player_name)
-
+    """WebSocket endpoint for players to subscribe to game updates."""
+    await game_manager.connect(websocket, game_id)
     try:
+        # Send the current state immediately when someone connects
         await game_manager.send_current_state(websocket, game_id)
 
         while True:
+            # Keep listening for messages from this client
             data = await websocket.receive_text()
-            # Optional: process player messages here
+            # (Optional) you could parse and handle commands here
             await game_manager.broadcast(game_id, {"event": "message", "data": data})
 
     except WebSocketDisconnect:
-        game_manager.disconnect(websocket, game_id, player_name)
-
+        game_manager.disconnect(websocket, game_id)
 
 
 @router.post("/create_game", response_model=CreateGameResponse)
