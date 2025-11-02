@@ -81,7 +81,7 @@ async def start_game(game_id: str):
             message = {
                 "event": "your_question",
                 "question": player.question,
-                'game': game.stage
+                'game': game.stage,
                 "is_imposter": player in game.imposters
             }
 
