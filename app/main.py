@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from app.routes import game
 
-from sqlalchemy.orm import Session
 import random, string# reset_room_table.py
 
 from fastapi.middleware.cors import CORSMiddleware
