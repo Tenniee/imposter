@@ -30,18 +30,18 @@ class GameManager:
     # ------------------------------
     # WebSocket Management
     # ------------------------------
-    async def connect(self, websocket: WebSocket, game_id: str):
-        """Add a websocket connection to a game."""
+    async def connect(self, websocket: WebSocket, game_id: str, player_name: str):
         await websocket.accept()
         if game_id not in self.connections:
-            self.connections[game_id] = []
-        self.connections[game_id].append(websocket)
+            self.connections[game_id] = {}
+        self.connections[game_id][player_name] = websocket
+        print(f"✅ {player_name} connected to game {game_id}")
 
-    def disconnect(self, websocket: WebSocket, game_id: str):
-        """Remove a websocket connection from a game."""
-        if game_id in self.connections:
-            if websocket in self.connections[game_id]:
-                self.connections[game_id].remove(websocket)
+    def disconnect(self, websocket: WebSocket, game_id: str, player_name: str):
+        if game_id in self.connections and player_name in self.connections[game_id]:
+            del self.connections[game_id][player_name]
+            print(f"❌ {player_name} disconnected from game {game_id}")
+
 
     async def broadcast(self, game_id: str, message: dict):
         """Send a message to all connected websockets in the game."""
