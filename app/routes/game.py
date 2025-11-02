@@ -62,22 +62,10 @@ async def join_game(req: JoinGameRequest):
 @router.post("/start_game/{game_id}")
 async def start_game(game_id: str):
     try:
-        # 1️⃣ Start the core game logic (assign imposters + questions)
+        # Step 1: Start the game and get the game object
         game = game_manager.start_game(game_id)
 
-        # 2️⃣ Send personalized questions to each player
-        for player in game.players:
-            await game_manager.send_to_player(
-                game_id,
-                player.name,
-                {
-                    "event": "your_question",
-                    "question": player.question,
-                    "is_imposter": player in game.imposters,
-                },
-            )
-
-        # 3️⃣ Broadcast the global state (not individual info)
+        # Step 2: Notify all players that the game has started
         await game_manager.broadcast(
             game_id,
             {
@@ -88,7 +76,19 @@ async def start_game(game_id: str):
             },
         )
 
-        # 4️⃣ Return the state via HTTP (for debugging or admin display)
+        # Step 3: Send individual questions to each player privately
+        for player in game.players:
+            message = {
+                "event": "your_question",
+                "question": player.question,
+                'game': game.stage
+                "is_imposter": player in game.imposters
+            }
+
+            # Send only to that player's WebSocket connection
+            await game_manager.send_to_player(game_id, player.name, message)
+
+        # Step 4: Return a simple confirmation
         return {
             "message": "Game started successfully!",
             "game_id": game.game_id,
@@ -99,6 +99,7 @@ async def start_game(game_id: str):
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
 
 
 @router.post("/games/{game_id}/submit-answer")
