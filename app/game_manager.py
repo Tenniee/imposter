@@ -31,19 +31,21 @@ class GameManager:
     # WebSocket Management
     # ------------------------------
     async def connect(self, websocket: WebSocket, game_id: str, player_name: str):
-        await websocket.accept()
+        if game_id not in self.active_connections:
+            self.active_connections[game_id] = []
+        self.active_connections[game_id].append(websocket)
 
-        # Store in list (existing structure)
-        if game_id not in self.connections:
-            self.connections[game_id] = []
-        self.connections[game_id].append(websocket)
+        # Optional: track players
+        if game_id not in self.games:
+            self.games[game_id] = {"players": []}
+        if player_name not in self.games[game_id]["players"]:
+            self.games[game_id]["players"].append(player_name)
 
-        # Store in map (new structure)
-        if game_id not in self.player_connections:
-            self.player_connections[game_id] = {}
-        self.player_connections[game_id][player_name] = websocket
-
-        print(f"✅ Player '{player_name}' connected to game {game_id}")
+        await self.broadcast(game_id, {
+            "event": "player_joined",
+            "player": player_name,
+            "players": self.games[game_id]["players"]
+        })
 
 
     def disconnect(self, websocket: WebSocket, game_id: str):
