@@ -30,35 +30,18 @@ class GameManager:
     # ------------------------------
     # WebSocket Management
     # ------------------------------
-    async def connect(self, websocket: WebSocket, game_id: str, player_name: str):
-        if game_id not in self.active_connections:
-            self.active_connections[game_id] = []
-        self.active_connections[game_id].append(websocket)
-
-        # Optional: track players
-        if game_id not in self.games:
-            self.games[game_id] = {"players": []}
-        if player_name not in self.games[game_id]["players"]:
-            self.games[game_id]["players"].append(player_name)
-
-        await self.broadcast(game_id, {
-            "event": "player_joined",
-            "player": player_name,
-            "players": self.games[game_id]["players"]
-        })
-
+    async def connect(self, websocket: WebSocket, game_id: str):
+        """Add a websocket connection to a game."""
+        await websocket.accept()
+        if game_id not in self.connections:
+            self.connections[game_id] = []
+        self.connections[game_id].append(websocket)
 
     def disconnect(self, websocket: WebSocket, game_id: str):
-        if game_id in self.connections and websocket in self.connections[game_id]:
-            self.connections[game_id].remove(websocket)
-
-        # Remove from player map as well
-        if game_id in self.player_connections:
-            for name, ws in list(self.player_connections[game_id].items()):
-                if ws == websocket:
-                    del self.player_connections[game_id][name]
-                    print(f"❌ Player '{name}' disconnected from {game_id}")
-                    break
+        """Remove a websocket connection from a game."""
+        if game_id in self.connections:
+            if websocket in self.connections[game_id]:
+                self.connections[game_id].remove(websocket)
 
     async def broadcast(self, game_id: str, message: dict):
         """Send a message to all connected websockets in the game."""
@@ -74,17 +57,6 @@ class GameManager:
             # cleanup broken connections
             for ws in to_remove:
                 self.disconnect(ws, game_id)
-    
-    async def send_to_player(self, game_id: str, player_name: str, message: dict):
-        if game_id in self.player_connections and player_name in self.player_connections[game_id]:
-            ws = self.player_connections[game_id][player_name]
-            try:
-                await ws.send_text(json.dumps(message))
-                print(f"📤 Sent private message to {player_name}: {message}")
-            except Exception as e:
-                print(f"⚠️ Failed to send message to {player_name}: {e}")
-        else:
-            print(f"⚠️ Player '{player_name}' not found in game {game_id}")
 
     # ------------------------------
     # Game State Updates
@@ -126,15 +98,15 @@ class GameManager:
         if len(players) < 3:
             raise ValueError("At least 3 players required")
 
-        # 🎭 Pick imposters
+        # Randomly assign imposters
         num_imposters = random.randint(1, len(players) - 1)
         imposters = random.sample(players, num_imposters)
         game.imposters = imposters
 
-        # 🧠 Generate questions
+        # Generate questions
         q_main, q_imposter = self.generate_questions()
 
-        # 📝 Assign questions
+        # Assign questions
         for p in players:
             if p in imposters:
                 p.question = q_imposter
