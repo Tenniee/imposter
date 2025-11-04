@@ -58,6 +58,23 @@ class GameManager:
             for ws in to_remove:
                 self.disconnect(ws, game_id)
 
+    async def send_to_player(self, game_id: str, player_name: str, message: dict):
+        """Send a direct message to a specific player if they're connected."""
+        try:
+            # Check if the game and player exist in active connections
+            if (
+                game_id in self.connections
+                and player_name in self.connections[game_id]
+            ):
+                ws = self.connections[game_id][player_name]
+                await ws.send_json(message)
+                print(f"📤 Sent to {player_name} in {game_id}: {message}")
+            else:
+                print(f"⚠️ Player '{player_name}' not connected to {game_id}")
+        except Exception as e:
+            print(f"❌ Failed to send message to {player_name} in {game_id}: {e}")
+
+
     # ------------------------------
     # Game State Updates
     # ------------------------------
