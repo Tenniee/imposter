@@ -6,22 +6,30 @@ router = APIRouter()
 game_manager = GameManager()
 
 
-@router.websocket("/ws/games/{game_id}")
-async def websocket_endpoint_for_joining_game_updates(websocket: WebSocket, game_id: str):
+@router.websocket("/ws/games/{game_id}/{player_name}")
+async def websocket_endpoint_for_joining_game_updates(websocket: WebSocket, game_id: str, player_name: str):
     """WebSocket endpoint for players to subscribe to game updates."""
-    await game_manager.connect(websocket, game_id)
+    # Store this player's connection
+    await game_manager.connect(websocket, game_id, player_name)
+
     try:
-        # Send the current state immediately when someone connects
+        # Send the current game state right after connection
         await game_manager.send_current_state(websocket, game_id)
 
         while True:
-            # Keep listening for messages from this client
+            # Listen for messages from this client
             data = await websocket.receive_text()
-            # (Optional) you could parse and handle commands here
-            await game_manager.broadcast(game_id, {"event": "message", "data": data})
+
+            # Optionally handle player messages here
+            await game_manager.broadcast(game_id, {
+                "event": "message",
+                "player": player_name,
+                "data": data
+            })
 
     except WebSocketDisconnect:
-        game_manager.disconnect(websocket, game_id)
+        game_manager.disconnect(websocket, game_id, player_name)
+        print(f"🔌 {player_name} disconnected from game {game_id}")
 
 
 @router.post("/create_game", response_model=CreateGameResponse)
