@@ -60,7 +60,9 @@ class GameManager:
             # Initialize WebSocket connections for this game
             self.connections[game_id] = {}
             
-            print(f"✅ Game {game_id} created in database")
+            print(f"✅ Game {game_id} created")
+            print(f"📋 self.connections = {self.connections}")  # Print entire dict
+            print(f"📍 GameManager instance ID: {id(self)}")  # Print instance memory address    
             return game
             
         finally:

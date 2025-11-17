@@ -9,6 +9,10 @@ game_manager = GameManager()
 @router.websocket("/ws/games/{game_id}/{player_name}")
 async def websocket_endpoint_for_joining_game_updates(websocket: WebSocket, game_id: str, player_name: str):
     """WebSocket endpoint for players to subscribe to game updates."""
+    print(f"🔌 WebSocket connecting to game {game_id}")
+    print(f"📍 GameManager instance ID: {id(game_manager)}")  # Print instance memory address
+    print(f"📋 self.connections = {game_manager.connections}")  # Print entire dict
+
     # Store this player's connection
     await game_manager.connect(websocket, game_id, player_name)
 
