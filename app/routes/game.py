@@ -73,7 +73,7 @@ async def start_game(game_id: str):
         # Step 1: Start the game and get the game object
         game = game_manager.start_game(game_id)
 
-        # Step 2: Notify all players that the game has started
+        # Step 2: Notify ALL players that the game has started (generic broadcast)
         await game_manager.broadcast(
             game_id,
             {
@@ -86,28 +86,30 @@ async def start_game(game_id: str):
 
         # Step 3: Send individual questions to each player privately
         for player in game.players:
+            is_imposter = player in game.imposters
+            
             message = {
                 "event": "your_question",
                 "question": player.question,
-                'game': game.stage,
-                "is_imposter": player in game.imposters
+                "stage": game.stage,  # Fixed typo: was 'game' should be 'stage'
+                "is_imposter": is_imposter
             }
 
             # Send only to that player's WebSocket connection
             await game_manager.send_to_player(game_id, player.name, message)
 
-        # Step 4: Return a simple confirmation
+        # Step 4: Return HTTP response (format unchanged!)
         return {
             "message": "Game started successfully!",
             "game_id": game.game_id,
             "stage": game.stage,
             "players": [p.name for p in game.players],
-            "imposters": [p.name for p in game.imposters],
+            # DON'T expose imposters in HTTP response for security!
+            # "imposters": [p.name for p in game.imposters],  # Remove this
         }
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
 
 
 @router.post("/games/{game_id}/submit-answer")
