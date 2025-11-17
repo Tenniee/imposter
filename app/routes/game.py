@@ -45,9 +45,23 @@ def create_game(req: CreateGameRequest):
 @router.post("/join_game", response_model=JoinGameResponse)
 async def join_game(req: JoinGameRequest):
     try:
+        print(f"🎮 {req.player_name} attempting to join game {req.game_id}")
+        
         game = game_manager.join_game(req.game_id, req.player_name)
+        
+        print(f"📊 Game now has {len(game.players)} players: {[p.name for p in game.players]}")
+        print(f"🔌 Checking WebSocket connections for game {req.game_id}...")
+        
+        # Check if there are any WebSocket connections
+        if req.game_id in game_manager.connections:
+            connected = list(game_manager.connections[req.game_id].keys())
+            print(f"   ✅ Connected players: {connected}")
+        else:
+            print(f"   ❌ No connections dict found for game {req.game_id}")
+            print(f"   Available game IDs: {list(game_manager.connections.keys())}")
 
         # 🔥 Notify everyone via WebSocket that a new player joined
+        print(f"📢 Broadcasting 'player_joined' event...")
         await game_manager.broadcast(
             req.game_id,
             {
@@ -57,6 +71,7 @@ async def join_game(req: JoinGameRequest):
                 "stage": game.stage
             }
         )
+        print(f"✅ Broadcast complete!")
 
         return JoinGameResponse(
             game_id=game.game_id,
@@ -64,8 +79,8 @@ async def join_game(req: JoinGameRequest):
             stage=game.stage
         )
     except ValueError as e:
+        print(f"❌ Error joining game: {e}")
         raise HTTPException(status_code=404, detail=str(e))
-
 
 @router.post("/start_game/{game_id}")
 async def start_game(game_id: str):
