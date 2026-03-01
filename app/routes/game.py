@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from app.schemas import CreateGameRequest, CreateGameResponse, JoinGameRequest, JoinGameResponse, SubmitAnswerRequest
 from app.game_manager import GameManager
+from app.db_models import DBPlayer
 
 router = APIRouter()
 game_manager = GameManager()
@@ -41,9 +42,10 @@ def create_game(req: CreateGameRequest):
     game = game_manager.create_game(req.host_name)
     return CreateGameResponse(
         game_id=game.game_id,
-        players=[p.name for p in game.players],
+        players=[{"id": p.player_id, "name": p.name} for p in game.players],
         stage=game.stage
     )
+
 
 
 @router.post("/join_game", response_model=JoinGameResponse)
@@ -71,7 +73,7 @@ async def join_game(req: JoinGameRequest):
             {
                 "event": "player_joined",
                 "player": req.player_name,
-                "players": [p.name for p in game.players],
+                "players": [{"id": p.player_id, "name": p.name} for p in game.players],
                 "stage": game.stage
             }
         )
@@ -79,9 +81,10 @@ async def join_game(req: JoinGameRequest):
 
         return JoinGameResponse(
             game_id=game.game_id,
-            players=[p.name for p in game.players],
+            players=[{"id": p.player_id, "name": p.name} for p in game.players],
             stage=game.stage
         )
+
     except ValueError as e:
         print(f"❌ Error joining game: {e}")
         raise HTTPException(status_code=404, detail=str(e))
@@ -111,7 +114,7 @@ async def start_game(game_id: str):
                 "event": "your_question",
                 "question": player.question,
                 "stage": game.stage,  # Fixed typo: was 'game' should be 'stage'
-                "is_imposter": is_imposter
+                "is_imposter": player.is_imposter
             }
 
             # Send only to that player's WebSocket connection
@@ -122,7 +125,7 @@ async def start_game(game_id: str):
             "message": "Game started successfully!",
             "game_id": game.game_id,
             "stage": game.stage,
-            "players": [p.name for p in game.players],
+            "players": [{"id": p.player_id, "name": p.name} for p in game.players],
             # DON'T expose imposters in HTTP response for security!
             # "imposters": [p.name for p in game.imposters],  # Remove this
         }
@@ -130,34 +133,47 @@ async def start_game(game_id: str):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-
 @router.post("/games/{game_id}/submit-answer")
 async def submit_answer(game_id: str, player_id: str, answer: str):
-    """
-    Endpoint for players to submit their answers.
-    When all players have submitted, automatically trigger reveal phase.
-    """
-    game = game_manager.games.get(game_id)
+    # Fix 1: use get_game(), not games.get()
+    game = game_manager.get_game(game_id)
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
 
-    # Find player
-    player = next((p for p in game.players if p.id == player_id), None)
+    # Fix 2: use player_id, not id
+    player = next((p for p in game.players if p.player_id == player_id), None)
     if not player:
         raise HTTPException(status_code=404, detail="Player not found")
 
-    # Store answer
+    # Fix 3: persist the answer to the database
+    db = game_manager._get_db()
+    try:
+        db.query(DBPlayer).filter(DBPlayer.player_id == player_id).update({
+            "answer": answer
+        })
+        db.commit()
+    finally:
+        db.close()
+
     player.answer = answer
 
-    # Check if all players have answered
-    all_answered = all(p.answer is not None for p in game.players)
+    # Re-fetch game from DB so answered_count reflects persisted state
+    game = game_manager.get_game(game_id)
 
+    answered_count = sum(1 for p in game.players if p.answer is not None)
+    await game_manager.broadcast(game_id, {
+        "event": "player_answered",
+        "player": player.name,
+        "answered_count": answered_count,
+        "total_players": len(game.players)
+    })
+
+    all_answered = all(p.answer is not None for p in game.players)
     if all_answered:
-        # Move to reveal phase
         await game_manager.reveal_answers(game_id)
 
     return {"status": "success", "message": "Answer submitted successfully"}
-    
+        
 @router.post("/games/{game_id}/vote/{player_id}/{target_id}")
 async def vote(game_id: str, player_id: str, target_id: str):
     """

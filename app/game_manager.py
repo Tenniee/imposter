@@ -264,6 +264,7 @@ class GameManager:
 
             # Generate questions
             q_main, q_imposter = self.generate_questions()
+            game.q_main = q_main
 
             # Assign questions and update database
             for player in game.players:
@@ -316,7 +317,8 @@ class GameManager:
 
         await self.broadcast(game_id, {
             "event": "reveal_answers",
-            "data": results
+            "data": results,
+            "question": game.q_main
         })
 
     async def reveal_imposter(self, game_id: str):
