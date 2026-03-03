@@ -147,6 +147,7 @@ class GameManager:
         # Create game
         game = Game(game_id=db_game.game_id, host=host)
         game.stage = db_game.stage
+        game.q_main = db_game.main_question
         
         # Add all other players
         for db_player in db_players:
