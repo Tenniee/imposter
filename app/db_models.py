@@ -22,6 +22,7 @@ class DBGame(Base):
     # Relationship: One game has many players
     players = relationship("DBPlayer", back_populates="game", cascade="all, delete-orphan")
     votes = relationship("DBVote", back_populates="game", cascade="all, delete-orphan")
+    main_question = Column(String, nullable=True)
 
 
 class DBPlayer(Base):

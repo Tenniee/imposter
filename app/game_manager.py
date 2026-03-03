@@ -266,6 +266,14 @@ class GameManager:
             q_main, q_imposter = self.generate_questions()
             game.q_main = q_main
 
+            # Save main question to DB + update stage
+            db.query(DBGame).filter(DBGame.game_id == game_id).update({
+                "stage": "question_answering",
+                "main_question": q_main
+            })
+
+            db.commit()
+
             # Assign questions and update database
             for player in game.players:
                 is_imposter = player in imposters
