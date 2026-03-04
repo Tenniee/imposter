@@ -332,57 +332,59 @@ class GameManager:
         })
 
     async def reveal_imposter(self, game_id: str):
-        """Reveal imposter and calculate scores"""
         db = self._get_db()
         try:
             print("🔥 reveal_imposter called")
 
-            game = self.get_game(game_id)
-            if not game:
-                return
-
             # Get votes from database
             votes = db.query(DBVote).filter(DBVote.game_id == game_id).all()
             vote_counts = {}
+
             for vote in votes:
                 voted_id = str(vote.voted_player_id)
                 vote_counts[voted_id] = vote_counts.get(voted_id, 0) + 1
 
             max_votes = max(vote_counts.values(), default=0)
-            most_voted_ids = [pid for pid, count in vote_counts.items() if count == max_votes]
+            most_voted_ids = [
+                pid for pid, count in vote_counts.items() if count == max_votes
+            ]
+
+            # Get all players from DB
+            players = db.query(DBPlayer).filter(DBPlayer.game_id == game_id).all()
+
+            # Determine imposter IDs from DB
+            imposter_ids = [p.player_id for p in players if p.is_imposter]
+            imposter_names = [p.name for p in players if p.is_imposter]
 
             # Calculate scores
-            for player in game.players:
-                if player in game.imposters and player.player_id not in most_voted_ids:
+            for player in players:
+                if player.is_imposter and player.player_id not in most_voted_ids:
                     player.score += 2
-                elif player not in game.imposters and any(
-                    imp.player_id in most_voted_ids for imp in game.imposters
+                elif (
+                    not player.is_imposter
+                    and any(imp_id in most_voted_ids for imp_id in imposter_ids)
                 ):
                     player.score += 1
-
-                # Update score in database
-                db.query(DBPlayer).filter(DBPlayer.player_id == player.player_id).update({
-                    "score": player.score
-                })
 
             # Update game stage
             db.query(DBGame).filter(DBGame.game_id == game_id).update({
                 "stage": "game_end"
             })
+
             db.commit()
 
-            # Broadcast results
+            # Prepare summary from DB players
             summary = {
                 "event": "reveal_imposter",
                 "stage": "game_end",
-                "imposters": [p.name for p in game.imposters],
+                "imposters": imposter_names,
                 "votes": vote_counts,
-                "scores": {p.name: p.score for p in game.players},
+                "scores": {p.name: p.score for p in players},
             }
 
             print("🔥 Broadcasting summary:", summary)
 
             await self.broadcast(game_id, summary)
-            
+
         finally:
             db.close()
