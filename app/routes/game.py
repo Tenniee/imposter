@@ -203,7 +203,7 @@ async def vote(game_id: str, player_id: str, target_id: str):
     else:
         new_vote = DBVote(
             game_id=game_id,
-            voter_id=player_id,
+            voter_player_id=player_id,
             voted_player_id=target_id
         )
         db.add(new_vote)
