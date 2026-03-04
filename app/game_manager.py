@@ -207,6 +207,7 @@ class GameManager:
     
     async def broadcast(self, game_id: str, message: dict):
         """Send a message to all players in a game"""
+
         if game_id not in self.connections:
             print(f"⚠️ No connections for game {game_id}")
             return
@@ -334,6 +335,8 @@ class GameManager:
         """Reveal imposter and calculate scores"""
         db = self._get_db()
         try:
+            print("🔥 reveal_imposter called")
+
             game = self.get_game(game_id)
             if not game:
                 return
@@ -376,6 +379,8 @@ class GameManager:
                 "votes": vote_counts,
                 "scores": {p.name: p.score for p in game.players},
             }
+
+            print("🔥 Broadcasting summary:", summary)
 
             await self.broadcast(game_id, summary)
             

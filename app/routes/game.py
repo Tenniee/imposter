@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from app.schemas import CreateGameRequest, CreateGameResponse, JoinGameRequest, JoinGameResponse, SubmitAnswerRequest
 from app.game_manager import GameManager
-from app.db_models import DBPlayer
+from app.db_models import DBPlayer, DBVote
 
 router = APIRouter()
 game_manager = GameManager()
@@ -191,12 +191,24 @@ async def vote(game_id: str, player_id: str, target_id: str):
     if not voter or not target:
         raise HTTPException(status_code=404, detail="Player not found")
 
-    # Step 3: Initialize votes if not already done
-    if not hasattr(game, "votes"):
-        game.votes = {}
+    db = game_manager._get_db()
 
-    # Step 4: Record or update vote
-    game.votes[player_id] = target_id
+    existing_vote = db.query(DBVote).filter(
+        DBVote.game_id == game_id,
+        DBVote.voter_id == player_id
+    ).first()
+
+    if existing_vote:
+        existing_vote.voted_player_id = target_id
+    else:
+        new_vote = DBVote(
+            game_id=game_id,
+            voter_id=player_id,
+            voted_player_id=target_id
+        )
+        db.add(new_vote)
+
+    db.commit()
 
     # Step 5: Count total votes received by each player
     vote_counts = {}
@@ -210,7 +222,9 @@ async def vote(game_id: str, player_id: str, target_id: str):
     })
 
     # Step 7: Check if all players have voted
-    all_voted = len(game.votes) == len(game.players)
+    total_votes = db.query(DBVote).filter(DBVote.game_id == game_id).count()
+    all_voted = total_votes == len(game.players)
+
     if all_voted:
         # Move to next stage
         game.stage = "reveal_imposter"
