@@ -195,7 +195,7 @@ async def vote(game_id: str, player_id: str, target_id: str):
 
     existing_vote = db.query(DBVote).filter(
         DBVote.game_id == game_id,
-        DBVote.voter_id == player_id
+        DBVote.vote_id == player_id
     ).first()
 
     if existing_vote:
