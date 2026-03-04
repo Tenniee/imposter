@@ -310,7 +310,7 @@ class GameManager:
             raise ValueError("Game not found")
 
         results = [
-            {"player": p.name, "answer": p.answer}
+            {"id": p.player_id, "name": p.name, "answer": p.answer}
             for p in game.players
         ]
 
