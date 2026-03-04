@@ -181,7 +181,7 @@ async def vote(game_id: str, player_id: str, target_id: str):
     Each player can only vote once, but they can change their vote before time is up.
     """
     # Step 1: Validate that the game exists
-    game = game_manager.games.get(game_id)
+    game = game_manager.get_game(game_id)
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
 
